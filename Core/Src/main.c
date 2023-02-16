@@ -46,8 +46,14 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 uint16_t adcRawData[20];
-uint16_t output_V;
-uint16_t output_T;
+float V;
+float T;
+uint16_t sum_V;
+uint16_t sum_T;
+float avg_V;
+float avg_T;
+uint32_t timestamp = 0;
+float bit = 3300.0/4096.0;
 typedef union
 {
 	struct
@@ -108,7 +114,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-
+  //HAL_ADC_Start_DMA(&hadc1, buffer, 20);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -119,11 +125,23 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  //HAL_Delay(10000);
-	  static uint32_t timestamp = 0;
 	  if(HAL_GetTick() >= timestamp)
 	  {
-		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 		  timestamp = HAL_GetTick() +1000;
+		  register int i;
+		  for (i = 0; i < 10; i++){
+			  //sum_V += adcRawData[i*2];  // sum V
+			  //sum_T += adcRawData[(i*2)+1]; // sum T
+			  sum_V += buffer[i].subData.ADC_IN0;  // sum V
+		  	  sum_T += buffer[i].subData.Temp; // sum T
+		  }
+		  avg_V = sum_V/10.0 ;
+		  avg_T = sum_T/10.0 ;
+		  V = (avg_V* bit)*2.0;
+		  T = (((avg_T* bit)-760)/25.0)+273.15;
+		  sum_V = 0;
+		  sum_T = 0;
+
 	  }
   }
   /* USER CODE END 3 */
@@ -199,13 +217,13 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = ENABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 2;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -214,7 +232,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
+  sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -224,7 +242,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
   sConfig.Rank = 2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -332,15 +350,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 
 }
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
-{
-	//buffer[1].subData.ADC_IN0 = buffer[1].buffer[0]-500;
-	//buffer[1].subData.Temp = buffer[1].buffer[1]-500;
-	output_V = buffer[1].buffer[0];
-	output_T = buffer[1].buffer[1];
-	//adcRawData = HAL_ADC_GetValue(&hadc1);
-	//HAL_ADC_Start_DMA(&hadc1, adcRawData, 20);
-}
+//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+//{
+//	//buffer[1].subData.ADC_IN0 = buffer[1].buffer[0]-500;
+//	//buffer[1].subData.Temp = buffer[1].buffer[1]-500;
+//	output_V = buffer[1].buffer[0];
+//	output_T = buffer[1].buffer[1];
+//	//adcRawData = HAL_ADC_GetValue(&hadc1);
+//	//HAL_ADC_Start_DMA(&hadc1, adcRawData, 20);
+//}
 /* USER CODE END 4 */
 
 /**
